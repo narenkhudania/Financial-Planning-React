@@ -1,7 +1,9 @@
 
 import React, { useMemo } from 'react';
 import { 
-  ResponsiveContainer, Radar, RadarChart, PolarGrid, PolarAngleAxis
+  ResponsiveContainer, Radar, RadarChart, PolarGrid, PolarAngleAxis,
+  PieChart as RePie, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
+  AreaChart, Area, CartesianGrid
 } from 'recharts';
 import { 
   TrendingUp, Target, Activity, Calculator,
@@ -9,7 +11,8 @@ import {
   ArrowRight, ShieldCheck, CheckCircle2, 
   ChevronRight, ArrowUpRight, ShieldAlert, Sparkles,
   Receipt, Briefcase, AlertCircle, Car, CreditCard,
-  LayoutGrid, ArrowDownRight, Users, ListChecks
+  LayoutGrid, ArrowDownRight, Users, ListChecks,
+  PieChart, BarChart3, LineChart
 } from 'lucide-react';
 import { FinanceState, DetailedIncome, View } from '../types';
 
@@ -17,6 +20,8 @@ interface DashboardProps {
   state: FinanceState;
   setView: (view: View) => void;
 }
+
+const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
 const Dashboard: React.FC<DashboardProps> = ({ state, setView }) => {
   const calculateTotalMemberIncome = (income: DetailedIncome) => {
@@ -42,6 +47,34 @@ const Dashboard: React.FC<DashboardProps> = ({ state, setView }) => {
   const surplusValue = householdIncome - householdExpenses - totalMonthlyDebt;
   const savingsRate = householdIncome > 0 ? (surplusValue / householdIncome) * 100 : 0;
   const dtiRatio = householdIncome > 0 ? ((totalMonthlyDebt * 12) / (householdIncome * 12)) * 100 : 0;
+
+  // Chart Data: Asset Mix
+  const assetMixData = useMemo(() => {
+    const groups = state.assets.reduce((acc, a) => {
+      acc[a.category] = (acc[a.category] || 0) + a.currentValue;
+      return acc;
+    }, {} as Record<string, number>);
+    return Object.entries(groups).map(([name, value]) => ({ name, value }));
+  }, [state.assets]);
+
+  // Chart Data: Budget Partition
+  const budgetData = useMemo(() => [
+    { name: 'Survival', value: householdExpenses, color: '#f59e0b' },
+    { name: 'Servicing', value: totalMonthlyDebt, color: '#ef4444' },
+    { name: 'Success', value: Math.max(0, surplusValue), color: '#6366f1' }
+  ], [householdExpenses, totalMonthlyDebt, surplusValue]);
+
+  // Chart Data: Wealth Trajectory (5 Years)
+  const trajectoryData = useMemo(() => {
+    const data = [];
+    let currentNW = netWorth;
+    const year = new Date().getFullYear();
+    for (let i = 0; i < 6; i++) {
+      data.push({ year: year + i, nw: Math.round(currentNW) });
+      currentNW = (currentNW * 1.08) + (surplusValue * 12); // Assume 8% growth + yearly surplus
+    }
+    return data;
+  }, [netWorth, surplusValue]);
 
   const initializationSteps = useMemo(() => [
     { 
@@ -125,7 +158,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, setView }) => {
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-100">
                 <Zap size={14} className="animate-pulse"/> Initialization Required
               </div>
-              <h2 className="text-4xl md:text-5xl font-black text-slate-950 tracking-tight leading-tight">Your Strategy Terminal <br/><span className="text-indigo-600 underline decoration-indigo-100 underline-offset-8">is Offline.</span></h2>
+              <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">Your Strategy Terminal <br/><span className="text-indigo-600 underline decoration-indigo-100 underline-offset-8">is Offline.</span></h2>
               <p className="text-slate-500 text-lg font-medium leading-relaxed max-w-md">
                 Complete your financial node mapping to activate automated cashflow waterfalls and net worth tracking.
               </p>
@@ -195,61 +228,181 @@ const Dashboard: React.FC<DashboardProps> = ({ state, setView }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Trajectory Insight */}
+        {/* Trajectory Insight - Primary Report */}
         <div className="lg:col-span-2 bg-slate-950 p-10 md:p-14 rounded-[4rem] text-white relative overflow-hidden shadow-2xl border border-white/5">
            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/10 blur-[150px] rounded-full translate-x-1/4 -translate-y-1/4 pointer-events-none" />
-           <div className="relative z-10 flex flex-col md:flex-row gap-12 items-center h-full">
-              <div className="flex-1 space-y-10">
+           <div className="relative z-10 flex flex-col h-full space-y-10">
+              <div className="flex justify-between items-start">
                  <div className="space-y-4">
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 text-indigo-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10">
-                       <Activity size={14}/> Actuarial Pulse
+                       <LineChart size={14}/> Wealth Velocity
                     </div>
-                    <h3 className="text-5xl font-black tracking-tight leading-none">Wealth <br/><span className="text-indigo-500">Stability.</span></h3>
-                    <p className="text-slate-400 font-medium text-base leading-relaxed">A mathematical visualization of your digital twin across core life vectors.</p>
+                    <h3 className="text-4xl font-black tracking-tight">Projected <span className="text-indigo-500">Equity.</span></h3>
                  </div>
-                 
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="p-6 bg-white/5 border border-white/10 rounded-3xl hover:bg-white/10 transition-all cursor-pointer" onClick={() => setView('inflow')}>
-                       <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Monthly Inflow</p>
-                       <p className="text-xl font-black">₹{householdIncome.toLocaleString()}</p>
-                    </div>
-                    <div className="p-6 bg-white/5 border border-white/10 rounded-3xl hover:bg-white/10 transition-all cursor-pointer" onClick={() => setView('outflow')}>
-                       <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Burn Rate</p>
-                       <p className="text-xl font-black text-rose-400">₹{(householdExpenses + totalMonthlyDebt).toLocaleString()}</p>
-                    </div>
+                 <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">5-Year Target</p>
+                    <p className="text-2xl font-black text-emerald-400">₹{trajectoryData[trajectoryData.length-1].nw.toLocaleString()}</p>
                  </div>
-
-                 <button onClick={() => setView('cashflow')} className="w-full py-6 bg-indigo-600 hover:bg-indigo-500 transition-all rounded-full font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl">
-                    View Cashflow Matrix <ArrowRight size={16}/>
-                 </button>
               </div>
 
-              <div className="w-full md:w-80 h-72 shrink-0 bg-white/5 rounded-[3.5rem] p-8 border border-white/10 backdrop-blur-sm flex items-center justify-center shadow-inner">
+              <div className="flex-1 min-h-[300px] w-full">
                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart cx="50%" cy="50%" outerRadius="80%" data={wellnessData}>
-                      <PolarGrid stroke="#ffffff10" />
-                      <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }} />
-                      <Radar name="Status" dataKey="A" stroke="#6366f1" strokeWidth={3} fill="#6366f1" fillOpacity={0.2} />
-                    </RadarChart>
+                    <AreaChart data={trajectoryData}>
+                       <defs>
+                          <linearGradient id="nwGradient" x1="0" y1="0" x2="0" y2="1">
+                             <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                             <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                          </linearGradient>
+                       </defs>
+                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
+                       <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{fill: '#475569', fontSize: 10, fontWeight: 900}} />
+                       <YAxis hide />
+                       <Tooltip 
+                          contentStyle={{ backgroundColor: '#0f172a', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)', padding: '12px', fontWeight: 'bold' }}
+                          formatter={(val: number) => `₹${val.toLocaleString()}`}
+                       />
+                       <Area type="monotone" dataKey="nw" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#nwGradient)" />
+                    </AreaChart>
                  </ResponsiveContainer>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="p-6 bg-white/5 border border-white/10 rounded-3xl hover:bg-white/10 transition-all cursor-pointer" onClick={() => setView('inflow')}>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Monthly Inflow</p>
+                    <p className="text-xl font-black">₹{householdIncome.toLocaleString()}</p>
+                 </div>
+                 <div className="p-6 bg-white/5 border border-white/10 rounded-3xl hover:bg-white/10 transition-all cursor-pointer" onClick={() => setView('outflow')}>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Burn Rate</p>
+                    <p className="text-xl font-black text-rose-400">₹{(householdExpenses + totalMonthlyDebt).toLocaleString()}</p>
+                 </div>
               </div>
            </div>
         </div>
 
-        {/* Tactical Alerts Feed */}
-        <div className="bg-white p-10 rounded-[3.5rem] border border-slate-200 shadow-sm flex flex-col h-full">
+        {/* Holistic Wellness Radar */}
+        <div className="bg-white p-10 rounded-[4rem] border border-slate-200 shadow-sm flex flex-col justify-between h-full">
+           <div className="space-y-2">
+              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl w-fit"><BrainCircuit size={24}/></div>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight italic">Node Health.</h3>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Actuarial Calibration</p>
+           </div>
+
+           <div className="w-full h-64 flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                 <RadarChart cx="50%" cy="50%" outerRadius="80%" data={wellnessData}>
+                   <PolarGrid stroke="#f1f5f9" />
+                   <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }} />
+                   <Radar name="Status" dataKey="A" stroke="#6366f1" strokeWidth={3} fill="#6366f1" fillOpacity={0.15} />
+                 </RadarChart>
+              </ResponsiveContainer>
+           </div>
+
+           <button onClick={() => setView('risk-profile')} className="w-full py-5 bg-slate-50 text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all">
+              Recalibrate Risk DNA
+           </button>
+        </div>
+      </div>
+
+      {/* New Reporting Row: Portfolio Mix & Budget Partitioning */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+         
+         {/* Portfolio Asset Mix Report */}
+         <div className="bg-white p-10 md:p-12 rounded-[4rem] border border-slate-200 shadow-sm relative overflow-hidden">
+            <div className="flex justify-between items-center mb-10">
+               <div className="flex items-center gap-4">
+                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><PieChart size={24}/></div>
+                  <div>
+                     <h3 className="text-xl font-black text-slate-900 tracking-tight">Portfolio Mix.</h3>
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Asset Classification</p>
+                  </div>
+               </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row items-center gap-8">
+               <div className="w-56 h-56 shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                     <RePie data={assetMixData} innerRadius={60} outerRadius={85} paddingAngle={5} dataKey="value">
+                        {assetMixData.map((entry, index) => (
+                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="transparent" />
+                        ))}
+                     </RePie>
+                  </ResponsiveContainer>
+               </div>
+               <div className="flex-1 space-y-4 w-full">
+                  {assetMixData.length > 0 ? assetMixData.map((item, i) => (
+                     <div key={item.name} className="flex items-center justify-between group">
+                        <div className="flex items-center gap-3">
+                           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                           <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">{item.name}</span>
+                        </div>
+                        <span className="text-sm font-black text-slate-900">₹{item.value.toLocaleString()}</span>
+                     </div>
+                  )) : (
+                     <p className="text-xs text-slate-400 italic">No assets registered to display mix.</p>
+                  )}
+               </div>
+            </div>
+         </div>
+
+         {/* Budget Partitioning Report */}
+         <div className="bg-white p-10 md:p-12 rounded-[4rem] border border-slate-200 shadow-sm relative overflow-hidden">
+            <div className="flex justify-between items-center mb-10">
+               <div className="flex items-center gap-4">
+                  <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl"><BarChart3 size={24}/></div>
+                  <div>
+                     <h3 className="text-xl font-black text-slate-900 tracking-tight">Cash Partition.</h3>
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Silo Allocation Audit</p>
+                  </div>
+               </div>
+            </div>
+
+            <div className="h-56 w-full">
+               <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={budgetData} layout="vertical" margin={{ left: 0, right: 30 }}>
+                     <XAxis type="number" hide />
+                     <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10, fontWeight: 900, textAnchor: 'start'}} width={80} />
+                     <Tooltip 
+                        cursor={{fill: '#f8fafc'}}
+                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontWeight: 'bold' }}
+                        formatter={(val: number) => `₹${val.toLocaleString()}`}
+                     />
+                     <Bar dataKey="value" radius={[0, 10, 10, 0]} barSize={32}>
+                        {budgetData.map((entry, index) => (
+                           <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                     </Bar>
+                  </BarChart>
+               </ResponsiveContainer>
+            </div>
+            
+            <div className="mt-6 flex justify-between items-center p-5 bg-slate-50 rounded-3xl border border-slate-100">
+               <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Monthly Surplus Flow</p>
+                  <p className="text-lg font-black text-indigo-600">₹{surplusValue.toLocaleString()}</p>
+               </div>
+               <div className="text-right">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Effort Rate</p>
+                  <p className="text-lg font-black text-emerald-600">{savingsRate.toFixed(1)}%</p>
+               </div>
+            </div>
+         </div>
+
+      </div>
+
+      {/* Tactical Alerts Feed */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-white p-10 rounded-[3.5rem] border border-slate-200 shadow-sm flex flex-col h-full">
            <div className="flex items-center justify-between mb-10">
               <div className="flex items-center gap-3">
-                 {/* Fixed: Added ListChecks to imports at the top and used here */}
                  <div className="p-2.5 bg-slate-900 text-white rounded-xl"><ListChecks size={20}/></div>
                  <h3 className="text-xl font-black text-slate-900 tracking-tight italic">Operations.</h3>
               </div>
               <div className={`w-2 h-2 rounded-full ${isFullyInitialized ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`} />
            </div>
 
-           <div className="space-y-5 flex-1 overflow-y-auto no-scrollbar">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 overflow-y-auto no-scrollbar">
               {!isFullyInitialized ? (
-                <div className="p-8 bg-slate-50 rounded-3xl border border-slate-100 text-center space-y-4">
+                <div className="col-span-2 p-12 bg-slate-50 rounded-3xl border border-slate-100 text-center space-y-4">
                    <AlertCircle size={32} className="text-slate-300 mx-auto"/>
                    <p className="text-xs font-bold text-slate-500 leading-relaxed italic">
                      Terminal offline. Complete the initialization steps to view tactical actions.
@@ -257,26 +410,38 @@ const Dashboard: React.FC<DashboardProps> = ({ state, setView }) => {
                 </div>
               ) : (
                 <>
-                  <div className="p-5 bg-indigo-50 border border-indigo-100 rounded-2xl group cursor-pointer hover:bg-white hover:shadow-lg transition-all" onClick={() => setView('investment-plan')}>
-                     <div className="flex items-center gap-2 mb-2">
+                  <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-[2.5rem] group cursor-pointer hover:bg-white hover:shadow-lg transition-all" onClick={() => setView('investment-plan')}>
+                     <div className="flex items-center gap-2 mb-3">
                         <TrendingUp size={12} className="text-indigo-600"/>
-                        <span className="text-[9px] font-black uppercase text-indigo-600">Rebalance Alert</span>
+                        <span className="text-[9px] font-black uppercase text-indigo-600">Alpha Leakage</span>
                      </div>
-                     <p className="text-xs font-bold text-slate-700 leading-snug">Asset allocation drifted by 14%. Adjust SIPs to match risk DNA.</p>
+                     <p className="text-xs font-bold text-slate-700 leading-snug">Asset allocation drifted. Adjust SIPs to match risk DNA. Potential: +2.1% Yield.</p>
                   </div>
-                  <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl group cursor-pointer hover:bg-white hover:shadow-lg transition-all" onClick={() => setView('tax-estate')}>
-                     <div className="flex items-center gap-2 mb-2">
+                  <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-[2.5rem] group cursor-pointer hover:bg-white hover:shadow-lg transition-all" onClick={() => setView('tax-estate')}>
+                     <div className="flex items-center gap-2 mb-3">
                         <ShieldCheck size={12} className="text-emerald-600"/>
-                        <span className="text-[9px] font-black uppercase text-emerald-600">Compliance Audit</span>
+                        <span className="text-[9px] font-black uppercase text-emerald-600">Audit Alert</span>
                      </div>
-                     <p className="text-xs font-bold text-slate-700 leading-snug">New Tax Regime migration suggested. Savings potential: ₹4,500/mo.</p>
+                     <p className="text-xs font-bold text-slate-700 leading-snug">New Tax Regime migration suggested. Annual Net Gain: ₹54,200.</p>
                   </div>
                 </>
               )}
            </div>
 
-           <button onClick={() => setView('action-plan')} className="mt-8 py-5 bg-slate-50 text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all">
-              View Strategy Map
+           <button onClick={() => setView('action-plan')} className="mt-8 py-5 bg-slate-950 text-white rounded-3xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl">
+              Execute Strategy Map
+           </button>
+        </div>
+
+        <div className="bg-indigo-600 p-10 rounded-[4rem] text-white flex flex-col justify-between shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all duration-500">
+           <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 blur-[80px] rounded-full translate-x-1/2 -translate-y-1/2" />
+           <div className="space-y-6 relative z-10">
+              <div className="p-4 bg-white/10 rounded-2xl w-fit"><Sparkles size={28}/></div>
+              <h4 className="text-3xl font-black leading-tight tracking-tight">Mission <br/>Control.</h4>
+              <p className="text-indigo-100 font-medium text-sm leading-relaxed">Run a precision simulation of your next big move—home purchase, sabbatical, or early FIRE.</p>
+           </div>
+           <button onClick={() => setView('cashflow')} className="relative z-10 w-full py-6 bg-white text-indigo-600 rounded-3xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 group/btn">
+              Start Simulation <ArrowRight size={16} className="group-hover/btn:translate-x-1 transition-transform"/>
            </button>
         </div>
       </div>
